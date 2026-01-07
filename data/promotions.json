@@ -1,0 +1,4 @@
+[
+  { "code": "NEWYEAR10", "discount_type": "percent", "value": 10, "start_date": "2026-01-01", "end_date": "2026-01-31", "applicable_categories": null },
+  { "code": "FREESHIP", "discount_type": "amount", "value": 50, "start_date": "2026-01-01", "end_date": "2026-12-31", "applicable_categories": null }
+]

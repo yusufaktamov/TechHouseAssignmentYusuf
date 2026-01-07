@@ -1,0 +1,140 @@
+FUNCTIONS IN `index.py`
+
+- load_json(path)
+  - JSON fayldan ma'lumotni o'qiydi va Python ob'ektiga qaytaradi.
+
+- save_json(path, data)
+  - Python ob'ektini JSON formatida faylga yozadi (indent=2, utf-8).
+
+- find_product(prod_id)
+  - Mahsulotlar ro'yxatidan berilgan `id`ga mos keluvchi mahsulotni topadi yoki `None` qaytaradi.
+
+- list_categories()
+  - Toifalar faylidan barcha toifalarni qaytaradi.
+
+- list_products(category_id=None)
+  - Barcha mahsulotlarni qaytaradi; agar `category_id` berilsa, faqat o'sha kategoriya mahsulotlarini filtrlaydi.
+
+- search_products(query)
+  - Mahsulot nomi yoki tavsifida so'rov (case-insensitive) bo'yicha qidiradi.
+
+- show_memberships()
+  - A'zolik paketlarini yuklab beradi.
+
+- get_promotions()
+  - Promo kodlar ro'yxatini yuklab beradi.
+
+- load_cart()
+  - Savatcha faylidan savatcha ob'ektini o'qiydi.
+
+- save_cart(cart)
+  - Savatcha ob'ektini faylga yozadi.
+
+- ask_confirm(prompt)
+  - Buyruq satrida ha/yo'q ("ha", "yes", "y") javobini tekshiradi va boolean qaytaradi.
+
+- normalize_cmd_parts(parts)
+  - CLI buyruqlarining birinchi tokenini qisqartma (canonical) ga normalizatsiya qiladi (masalan "add" -> "a").
+
+- load_users()
+  - `users.json` faylini o'qiydi va foydalanuvchilar ro'yxatini qaytaradi.
+
+- save_users(users)
+  - Foydalanuvchilar ro'yxatini faylga saqlaydi.
+
+- find_user_by_email(email)
+  - Email bo'yicha foydalanuvchini topadi (case-insensitive) yoki `None` qaytaradi.
+
+- change_password_flow()
+  - Interaktiv: email tasdiqlaydi, yangi parolni ikki marta so'raydi va agar email mavjud bo'lsa, foydalanuvchi parolini yangilaydi.
+
+- hash_password(password, salt=None)
+  - Parolni PBKDF2-HMAC-SHA256 bilan xeshlaydi; salt yaratadi yoki qabul qiladi; (salt_hex, hash_hex) qaytaradi.
+
+- verify_password(password, salt_hex, hash_hex)
+  - Kiritilgan parolni saqlangan salt va hash bilan tekshiradi.
+
+- set_user_password(user, password)
+  - Foydalanuvchi obyektiga `salt` va `password_hash` maydonlarini qo'shadi; legacy `password` maydonini olib tashlaydi.
+
+- ensure_admin_user()
+  - Agar admin foydalanuvchi mavjud bo'lmasa, `ADMIN_EMAIL` va `ADMIN_PASSWORD` bilan admin yaratadi.
+
+- migrate_plain_passwords()
+  - Avvalgi (legacy) `password` maydoni bo'lgan foydalanuvchilarni yangi hash sxemasiga o'tkazadi.
+
+- login_prompt()
+  - CLI orqali login/ro'yxatdan o'tish jarayoni. Endi:
+    - Ism va email so'raladi, so'ng faqat parol maydoni qayta so'raladi (agar noto'g'ri bo'lsa).
+    - Parol maydonida `change` yozilsa `change_password_flow()` ochiladi.
+    - Yangi foydalanuvchi yaratish uchun email mavjud bo'lmasa parol bilan yangi hisob yaratiladi.
+
+- admin_menu()
+  - Admin uchun menyu; foydalanuvchilar, mahsulotlar, buyurtmalar va mahsulot qo'shish imkoniyatlari.
+
+- get_user_orders(email)
+  - Berilgan emailga tegishli buyurtmalar ro'yxatini qaytaradi.
+
+- view_my_orders()
+  - Joriy foydalanuvchi (CURRENT_USER) uchun buyurtma tarixini ekranga chiqaradi.
+
+- add_to_cart(prod_id, qty)
+  - Mahsulotni savatchaga qo'shadi (stokni tekshiradi, foydalanuvchidan tasdiq oladi).
+
+- view_cart(), clear_cart(), remove_from_cart(prod_id)
+  - Savatchani ko'rsatish, tozalash (tasdiq bilan), va elementni olib tashlash (tasdiq bilan).
+
+- compute_membership_effects(total, membership_id, qty=None, shipping_method=None)
+  - A'zolikning turiga qarab chegirma, ballar, bepul yetkazib berish va maxsus chegirmalarni hisoblab qaytaradi.
+
+- apply_membership_discount(total, membership_id, qty=None, shipping_method=None)
+  - compute_membership_effects wrapper; (total_after, discount) qaytaradi.
+
+- apply_promo(total, code)
+  - Promo kodni tekshiradi va chegirma miqdorini hisoblaydi; amal qilmasa boshlang'ich qiymatni qaytaradi.
+
+- checkout()
+  - Savatdagi narsalarni to'lov jarayoni: a'zolik, promo, yetkazib berish, buyurtma yaratish, stockni yangilash va faylga yozish.
+
+- purchase_product_direct(prod_id, qty)
+  - Mahsulotni tez sotib olish jarayoni (checkout jarayonining qisqaroq shakli), stokni yangilaydi va buyurtma yaratiladi.
+
+- purchase_membership(membership_id)
+  - A'zolik paketini sotib olish: buyurtma yaratadi va foydalanuvchi yozuviga `membership_id` qo'yadi.
+
+- purchase_from_cart(prod_id)
+  - Savatchadan mahsulotni sotib olish; muvaffaqiyatli bo'lsa savatchadan o'chiradi.
+
+- send_support_message()
+  - Qo'llab‑quvvatlash uchun xabar yozish, saqlash va tasdiqlash.
+
+- print_main(), print_help(), main()
+  - CLI menyularini chiqarish va asosiy dastur oqimi (fayllarni tayyorlash, admin yaratish, login qilish va asosiy menyuni ko'rsatish).
+
+
+FUNCTIONS IN `tests/test_cli_flow.py`
+
+- backup_files()
+  - Testlar uchun kerakli JSON fayllarning zaxira nusxasini (.bak) yaratadi.
+
+- restore_files(bak)
+  - Backup fayllardan asl fayllarni tiklaydi va .bak fayllarni o'chiradi.
+
+- test_* functions
+  - Bir-biriga bog'liq emas testlar to'plami; quyidagilarni tekshiradi:
+    - `test_normalize_cmd_parts`: buyruq tokenlarini normalizatsiya qilish.
+    - `test_add_and_purchase_flow`: mahsulotni savatchaga qo'shish va to'g'ridan-to'g'ri sotib olish oqimi.
+    - `test_purchase_from_cart`: savatchadan to'lov va buyurtma yaratilishi.
+    - `test_quick_action_add_buy_only`, `test_shorthand_1_and_2`: qisqa buyruqlar (add/buy/1/2) bilan ishlash.
+    - `test_user_sees_own_purchases`: foydalanuvchi o'z buyurtmalarini ko'rishi.
+    - `test_admin_sees_all_purchases`, `test_admin_handles_orders_without_user_email`, `test_admin_add_product`, `test_admin_sees_global_order_history`: admin menyusi va buyurtmalarni ko'rsatish/qo'shish testlari.
+    - `test_purchase_membership_sets_user_membership`, `test_purchase_direct_with_user_membership_applies_discount`, `test_purchase_direct_with_user_membership_declines_discount`: a'zolik va chegirmalar bilan bog'liq testlar.
+    - `test_password_hash_migration`: eski `password` maydoni bo'lgan foydalanuvchilarni login qilingandan keyin `password_hash` va `salt` ga migratsiya qilinishini tekshiradi.
+    - `test_incorrect_password_reprompts_password`: noto'g'ri parol kiritilganda faqat parol maydoni qayta so'ralishini testlaydi.
+    - `test_change_password_via_change_keyword`: parol maydonida `change` yozilganda email orqali parolni almashtirish va yangi parol bilan tizimga kirish ishlashini tekshiradi.
+    - `test_gold_free_shipping_applied`, `test_business_bulk_special_discount`: a'zoliklarga mos ravishda bepul yetkazib berish yoki maxsus ko'proq chegirma holatlarini test qiladi.
+
+
+---
+
+Agar xohlasangiz, men ushbu matnni boshqa formatga (Markdown yoki PDF) yoki kengaytirilgan hujjatga aylantirishim mumkin. 

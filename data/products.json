@@ -1,0 +1,63 @@
+[
+  {
+    "id": 1,
+    "name": "Mixer Pro 3000",
+    "price": 200.0,
+    "stock": 9,
+    "status": "available",
+    "category_id": 1,
+    "description": "Kuchli mixer"
+  },
+  {
+    "id": 2,
+    "name": "Electric Oven X",
+    "price": 450.0,
+    "stock": 5,
+    "status": "available",
+    "category_id": 1,
+    "description": "Ajoyib pech"
+  },
+  {
+    "id": 3,
+    "name": "Vacuum Clean 200",
+    "price": 80.0,
+    "stock": 13,
+    "status": "available",
+    "category_id": 2,
+    "description": "Changyutgich"
+  },
+  {
+    "id": 4,
+    "name": "AirCool AC 9k",
+    "price": 300.0,
+    "stock": 7,
+    "status": "available",
+    "category_id": 3,
+    "description": "Sovitish qurilmasi"
+  },
+  {
+    "id": 5,
+    "name": "Smart Bulb",
+    "price": 20.0,
+    "stock": 50,
+    "status": "available",
+    "category_id": 5,
+    "description": "Aqlli lampochka"
+  },
+  {
+    "id": 6,
+    "name": "Electric Shaver",
+    "price": 35.0,
+    "stock": 20,
+    "status": "available",
+    "category_id": 4,
+    "description": "Shaxsiy parvarish uchun"
+  },
+  {
+    "id": 7,
+    "name": "HP Victus",
+    "price": 7500.0,
+    "stock": 10,
+    "type": "noutbook"
+  }
+]

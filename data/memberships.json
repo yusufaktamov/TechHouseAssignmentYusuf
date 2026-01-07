@@ -1,0 +1,6 @@
+[
+  { "id": 1, "name": "Bronze", "discount_rate": 0.02, "points_multiplier": 1, "priority_support": false, "free_shipping_threshold": null, "price": 50.0 },
+  { "id": 2, "name": "Silver", "discount_rate": 0.05, "points_multiplier": 1.5, "priority_support": true, "free_shipping_threshold": null, "price": 80.0 },
+  { "id": 3, "name": "Gold", "discount_rate": 0.1, "points_multiplier": 2, "priority_support": true, "free_shipping_threshold": 200.0, "price": 120.0 },
+  { "id": 4, "name": "Business", "discount_rate": 0.12, "points_multiplier": 3, "priority_support": true, "free_shipping_threshold": 500.0, "price": 150.0 }
+]

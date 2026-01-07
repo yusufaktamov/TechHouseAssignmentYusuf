@@ -1,0 +1,73 @@
+[
+  {
+    "name": "Admin",
+    "email": "aktamovyusuf007@gmail.com",
+    "address": "",
+    "orders": [],
+    "is_admin": true,
+    "password_hash": "148c8d1ebbbb9298772866aeabcd0cf8ff5e8443893d94f608e09a869df2859c",
+    "salt": "5d798461a440f03c74706ba45833754e"
+  },
+  {
+    "name": "Test",
+    "email": "test@example.com",
+    "address": "Nowhere",
+    "orders": [
+      3
+    ],
+    "password_hash": "300cd019bd65998ba8ef7a8f7f61f10b09c152617da05b9668c84b147b1d0699",
+    "salt": "1d28ef171565f2daae9f39a7c66f8ee3"
+  },
+  {
+    "name": "Admin",
+    "email": "actamovyusuf007@gmail.com",
+    "address": "",
+    "orders": [],
+    "is_admin": true,
+    "password_hash": "20d70f31510fac4678a45ecb3a7d455c328e7f12006d44d9b7857622594c288a",
+    "salt": "1d8a63e2c641bdd1b051525ce8918eb6"
+  },
+  {
+    "name": "NENDO",
+    "email": "luxnendo@gmail.com",
+    "address": "Toshkent",
+    "orders": [
+      4
+    ],
+    "is_admin": false,
+    "password_hash": "74e116ebba7a04a4052b72700f5b29d68f649bdfe8e6fd3f2826be9b63edf635",
+    "salt": "d94d5ecd76bada1c7587fa203381912a"
+  },
+  {
+    "name": "Yusuf",
+    "email": "yusufaktamov@gmail.com",
+    "address": "Samarqand",
+    "orders": [
+      2
+    ],
+    "is_admin": false,
+    "password_hash": "e44e16ba7040ea5d6236c629ab284c44b4b1e9bca21b8bbeb848f1d09252b028",
+    "salt": "a644ce16235fbe15c89c47d44b422b48",
+    "membership_id": 2
+  },
+  {
+    "name": "Buyer2",
+    "email": "buyer2@example.com",
+    "address": "X",
+    "orders": [],
+    "password_hash": "1039968e6f8a2b3f2290da94f37eb7b951d812ef9222f6b7bbfdc7381900b1c2",
+    "salt": "db63c9cb35da1a1460a18d77db9f9c92",
+    "membership_id": 2
+  },
+  {
+    "name": "Memb",
+    "email": "memb@example.com",
+    "address": "X",
+    "orders": [
+      1
+    ],
+    "membership_id": 3,
+    "password_hash": "2f81d4437d944216eeef2f1985c9aad11fba6503c4c7e3552ce5f8777bfc5c74",
+    "salt": "2d28c39c5e7a9e51bf4e6dfe2e9958af"
+  }
+]
