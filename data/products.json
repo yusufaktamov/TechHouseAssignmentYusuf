@@ -30,7 +30,7 @@
     "id": 4,
     "name": "AirCool AC 9k",
     "price": 300.0,
-    "stock": 7,
+    "stock": 6,
     "status": "available",
     "category_id": 3,
     "description": "Sovitish qurilmasi"
@@ -57,7 +57,7 @@
     "id": 7,
     "name": "HP Victus",
     "price": 7500.0,
-    "stock": 10,
+    "stock": 9,
     "type": "noutbook"
   }
 ]

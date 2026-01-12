@@ -32,11 +32,14 @@
     "email": "luxnendo@gmail.com",
     "address": "Toshkent",
     "orders": [
-      4
+      4,
+      3,
+      5
     ],
     "is_admin": false,
     "password_hash": "74e116ebba7a04a4052b72700f5b29d68f649bdfe8e6fd3f2826be9b63edf635",
-    "salt": "d94d5ecd76bada1c7587fa203381912a"
+    "salt": "d94d5ecd76bada1c7587fa203381912a",
+    "membership_id": 4
   },
   {
     "name": "Yusuf",

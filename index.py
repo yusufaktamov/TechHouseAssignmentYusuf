@@ -292,9 +292,8 @@ def admin_menu():
         print("\n--- Admin panel ---")
         print("1. Barcha foydalanuvchilar")
         print("2. Mahsulotlar: sotilgan / sotilmagan")
-        print("3. Foydalanuvchi menyusini ko'rsatish (aloxida)")
-        print("4. Barcha buyurtmalar (xaridlar tarixi)")
-        print("5. Mahsulot qo'shish")
+        print("3. Barcha buyurtmalar (xaridlar tarixi)")
+        print("4. Mahsulot qo'shish")
         print("0. Orqaga (logout)")
         choice = input("Tanlov: ").strip()
         if choice == "1":
@@ -327,27 +326,8 @@ def admin_menu():
             for p in products:
                 if p["id"] not in sold_counts:
                     print(f"- [{p['id']}] {p['name']} (stock: {p.get('stock')})")
+
         elif choice == "3":
-            email = input("Foydalanuvchi email: ").strip()
-            u = find_user_by_email(email)
-            if not u:
-                print("Foydalanuvchi topilmadi.")
-            else:
-                print("\n--- Foydalanuvchi menyusi (ko'rish uchun) ---")
-                print(f"Ism: {u.get('name')}")
-                print(f"Pochta: {u.get('email')}")
-                print(f"Manzil: {u.get('address')}")
-                # show purchases
-                orders = load_json(ORDERS_FILE)
-                user_orders = [o for o in orders if o.get('user_email') == u.get('email')]
-                if not user_orders:
-                    print("Xaridlar: Yo'q")
-                else:
-                    for o in user_orders:
-                        print(f"- Buyurtma #{o['id']} Jami: {o['total']:.2f}")
-                        for it in o.get('items', []):
-                            print(f"    - {it.get('name')} x {it.get('qty')}")
-        elif choice == "4":
             orders = load_json(ORDERS_FILE)
             if not orders:
                 print("Buyurtma topilmadi.")
@@ -360,7 +340,7 @@ def admin_menu():
                     print(f"  Manzil: {buyer.get('address')}")
                     for it in o.get('items', []):
                         print(f"    - {it.get('name')} x {it.get('qty')}")
-        elif choice == "5":
+        elif choice == "4":
             # Add new product (admin-only)
             print("\n--- Yangi mahsulot qo'shish ---")
             name = input("Mahsulot nomi: ").strip()

@@ -252,7 +252,7 @@ def test_admin_handles_orders_without_user_email(monkeypatch, capsys):
         shop.save_json(shop.ORDERS_FILE, orders)
         admin = shop.find_user_by_email(shop.ADMIN_EMAIL)
         shop.CURRENT_USER = admin
-        seq = iter(['4','0'])
+        seq = iter(['3','0'])
         monkeypatch.setattr('builtins.input', lambda prompt='': next(seq))
         shop.admin_menu()
         captured = capsys.readouterr()
@@ -269,7 +269,7 @@ def test_admin_add_product(monkeypatch):
         orig = len(prods)
         admin = shop.find_user_by_email(shop.ADMIN_EMAIL)
         shop.CURRENT_USER = admin
-        seq = iter(['5', 'NewProduct', '123.45', 'TestType', '7', '0'])
+        seq = iter(['4', 'NewProduct', '123.45', 'TestType', '7', '0'])
         monkeypatch.setattr('builtins.input', lambda prompt='': next(seq))
         shop.admin_menu()
         prods_after = shop.load_json(shop.PRODUCTS_FILE)
@@ -298,7 +298,7 @@ def test_admin_sees_global_order_history(monkeypatch, capsys):
         shop.save_json(shop.ORDERS_FILE, orders)
         admin = shop.find_user_by_email(shop.ADMIN_EMAIL)
         shop.CURRENT_USER = admin
-        seq = iter(['4','0'])
+        seq = iter(['3','0'])
         monkeypatch.setattr('builtins.input', lambda prompt='': next(seq))
         shop.admin_menu()
         captured = capsys.readouterr()

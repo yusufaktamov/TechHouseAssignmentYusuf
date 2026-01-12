@@ -40,5 +40,68 @@
     "user_email": "yusufaktamov@gmail.com",
     "user_name": "Yusuf",
     "created_at": "2026-01-03T20:28:53.455426"
+  },
+  {
+    "id": 3,
+    "items": [
+      {
+        "product_id": 7,
+        "qty": 1,
+        "unit_price": 7500.0,
+        "name": "HP Victus"
+      }
+    ],
+    "subtotal": 7500.0,
+    "membership_discount": 0.0,
+    "promo_discount": 0.0,
+    "shipping_fee": 50.0,
+    "total": 7550.0,
+    "shipping_method": "delivery",
+    "address": "Toshkent",
+    "user_email": "luxnendo@gmail.com",
+    "user_name": "NENDO",
+    "created_at": "2026-01-12T11:01:25.060532"
+  },
+  {
+    "id": 4,
+    "items": [
+      {
+        "membership_id": 4,
+        "qty": 1,
+        "unit_price": 150.0,
+        "name": "Membership: Business"
+      }
+    ],
+    "subtotal": 150.0,
+    "membership_discount": 0.0,
+    "promo_discount": 0.0,
+    "shipping_fee": 0.0,
+    "total": 150.0,
+    "shipping_method": "membership",
+    "address": null,
+    "user_email": "luxnendo@gmail.com",
+    "user_name": "NENDO",
+    "created_at": "2026-01-12T11:02:32.989390"
+  },
+  {
+    "id": 5,
+    "items": [
+      {
+        "product_id": 4,
+        "qty": 1,
+        "unit_price": 300.0,
+        "name": "AirCool AC 9k"
+      }
+    ],
+    "subtotal": 300.0,
+    "membership_discount": 36.0,
+    "promo_discount": 0.0,
+    "shipping_fee": 50.0,
+    "total": 314.0,
+    "shipping_method": "delivery",
+    "address": "Toshkent",
+    "user_email": "luxnendo@gmail.com",
+    "user_name": "NENDO",
+    "created_at": "2026-01-12T11:03:16.989645"
   }
 ]
