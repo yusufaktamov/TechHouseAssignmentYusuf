@@ -135,6 +135,4 @@ FUNCTIONS IN `tests/test_cli_flow.py`
     - `test_gold_free_shipping_applied`, `test_business_bulk_special_discount`: a'zoliklarga mos ravishda bepul yetkazib berish yoki maxsus ko'proq chegirma holatlarini test qiladi.
 
 
----
-
-Agar xohlasangiz, men ushbu matnni boshqa formatga (Markdown yoki PDF) yoki kengaytirilgan hujjatga aylantirishim mumkin. 
+--- 
