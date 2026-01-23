@@ -137,12 +137,13 @@ class ShippingManager:
 
 
 class PurchaseManager:
-    def __init__(self, data_manager, user_manager, product_manager, discount_manager, shipping_manager):
+    def __init__(self, data_manager, user_manager, product_manager, discount_manager, shipping_manager, order_service):
         self.data_manager = data_manager
         self.user_manager = user_manager
         self.product_manager = product_manager
         self.discount_manager = discount_manager
         self.shipping_manager = shipping_manager
+        self.order_service = order_service
 
     def prompt_membership(self):
         membership_id = None
@@ -184,7 +185,7 @@ class PurchaseManager:
         if confirm not in ("ha", "yes", "y"):
             print("Buyurtma bekor qilindi.")
             return None
-        return {
+        purchase_data = {
             "items": items,
             "subtotal": subtotal,
             "membership_discount": mem_discount,
@@ -192,8 +193,67 @@ class PurchaseManager:
             "shipping_fee": shipping_fee,
             "total": total,
             "shipping_method": shipping_method,
-            "address": address
+            "address": address,
+            "user_email": self.user_manager.current_user.get("email") if self.user_manager.current_user else None,
+            "user_name": self.user_manager.current_user.get("name") if self.user_manager.current_user else None
         }
+        order = self.order_service.create_order_from_purchase(purchase_data)
+        print(f"Buyurtma #{order['id']} qabul qilindi. Jami: {order['total']:.2f}")
+        return order
+
+
+class OrderRepository:
+    def __init__(self, data_manager):
+        self.data_manager = data_manager
+
+    def load_orders(self):
+        if not os.path.exists(ORDERS_FILE):
+            return []
+        return self.data_manager.load_json(ORDERS_FILE)
+
+    def save_orders(self, orders):
+        self.data_manager.save_json(ORDERS_FILE, orders)
+
+    def get_user_orders(self, email):
+        orders = self.load_orders()
+        return [o for o in orders if o.get('user_email') == email]
+
+    def create_order(self, order_data):
+        orders = self.load_orders()
+        order = {
+            "id": len(orders) + 1,
+            **order_data,
+            "created_at": datetime.now().isoformat()
+        }
+        orders.append(order)
+        self.save_orders(orders)
+        return order
+
+
+class OrderService:
+    def __init__(self, data_manager, order_repository, product_manager, user_manager):
+        self.data_manager = data_manager
+        self.order_repository = order_repository
+        self.product_manager = product_manager
+        self.user_manager = user_manager
+
+    def create_order_from_purchase(self, purchase_data):
+        order = self.order_repository.create_order(purchase_data)
+        # Update stocks
+        products = self.data_manager.load_json(PRODUCTS_FILE)
+        for it in purchase_data["items"]:
+            for p in products:
+                if p["id"] == it["product_id"]:
+                    p["stock"] = max(0, p.get("stock", 0) - it["qty"])
+        self.data_manager.save_json(PRODUCTS_FILE, products)
+        # Record order under user if logged in
+        if self.user_manager.current_user:
+            users = self.user_manager.load_users()
+            u = next((x for x in users if x.get('email') == self.user_manager.current_user.get('email')), None)
+            if u is not None:
+                u.setdefault('orders', []).append(order['id'])
+                self.user_manager.save_users(users)
+        return order
 
 
 class UserManager:
@@ -481,19 +541,14 @@ class CartManager:
 
 
 class OrderManager:
-    def __init__(self, data_manager, user_manager, product_manager, cart_manager, discount_manager, shipping_manager, purchase_manager):
-        self.data_manager = data_manager
+    def __init__(self, user_manager, order_repository, order_service):
         self.user_manager = user_manager
-        self.product_manager = product_manager
-        self.cart_manager = cart_manager
-        self.discount_manager = discount_manager
-        self.shipping_manager = shipping_manager
-        self.purchase_manager = purchase_manager
+        self.order_repository = order_repository
+        self.order_service = order_service
 
     def get_user_orders(self, email):
         """Return list of orders for a given user email."""
-        orders = self.data_manager.load_json(ORDERS_FILE)
-        return [o for o in orders if o.get('user_email') == email]
+        return self.order_repository.get_user_orders(email)
 
     def view_my_orders(self):
         if not self.user_manager.current_user:
@@ -519,36 +574,10 @@ class OrderManager:
         membership_id = self.purchase_manager.prompt_membership()
         qty_total = sum(it.get('qty', 0) for it in cart['items'])
         promo_code = input("Promo kod (yoksa ENTER): ").strip()
-        purchase_data = self.purchase_manager.process_purchase(cart["items"], subtotal, membership_id, qty_total, promo_code)
-        if purchase_data is None:
+        order = self.purchase_manager.process_purchase(cart["items"], subtotal, membership_id, qty_total, promo_code)
+        if order is None:
             return
-        # create order and update stocks
-        orders = self.data_manager.load_json(ORDERS_FILE)
-        order = {
-            "id": len(orders) + 1,
-            **purchase_data,
-            "user_email": self.user_manager.current_user.get("email") if self.user_manager.current_user else None,
-            "user_name": self.user_manager.current_user.get("name") if self.user_manager.current_user else None,
-            "created_at": datetime.now().isoformat()
-        }
-        # decrement stock
-        products = self.data_manager.load_json(PRODUCTS_FILE)
-        for it in cart["items"]:
-            for p in products:
-                if p["id"] == it["product_id"]:
-                    p["stock"] = max(0, p.get("stock", 0) - it["qty"])
-        self.data_manager.save_json(PRODUCTS_FILE, products)
-        orders.append(order)
-        self.data_manager.save_json(ORDERS_FILE, orders)
-        # record order under user if logged in
-        if self.user_manager.current_user:
-            users = self.user_manager.load_users()
-            u = next((x for x in users if x.get('email') == self.user_manager.current_user.get('email')), None)
-            if u is not None:
-                u.setdefault('orders', []).append(order['id'])
-                self.user_manager.save_users(users)
         self.cart_manager.clear_cart()
-        print(f"Buyurtma #{order['id']} qabul qilindi. Jami: {order['total']:.2f}")
 
     def purchase_product_direct(self, prod_id, qty):
         product = self.product_manager.find_product(prod_id)
@@ -571,33 +600,9 @@ class OrderManager:
             "unit_price": product["price"],
             "name": product["name"]
         }]
-        purchase_data = self.purchase_manager.process_purchase(items, subtotal, membership_id, qty, promo_code)
-        if purchase_data is None:
+        order = self.purchase_manager.process_purchase(items, subtotal, membership_id, qty, promo_code)
+        if order is None:
             return False
-        # create order and update stocks
-        orders = self.data_manager.load_json(ORDERS_FILE)
-        order = {
-            "id": len(orders) + 1,
-            **purchase_data,
-            "user_email": self.user_manager.current_user.get("email") if self.user_manager.current_user else None,
-            "user_name": self.user_manager.current_user.get("name") if self.user_manager.current_user else None,
-            "created_at": datetime.now().isoformat()
-        }
-        products = self.data_manager.load_json(PRODUCTS_FILE)
-        for p in products:
-            if p["id"] == prod_id:
-                p["stock"] = max(0, p.get("stock", 0) - qty)
-        self.data_manager.save_json(PRODUCTS_FILE, products)
-        orders.append(order)
-        self.data_manager.save_json(ORDERS_FILE, orders)
-        # record order under user if logged in
-        if self.user_manager.current_user:
-            users = self.user_manager.load_users()
-            u = next((x for x in users if x.get('email') == self.user_manager.current_user.get('email')), None)
-            if u is not None:
-                u.setdefault('orders', []).append(order['id'])
-                self.user_manager.save_users(users)
-        print(f"Buyurtma #{order['id']} qabul qilindi. Jami: {order['total']:.2f}")
         return True
 
     def purchase_membership(self, membership_id):
@@ -674,9 +679,11 @@ class CLI:
         self.product_manager = ProductManager(self.data_manager)
         self.discount_manager = DiscountManager(self.data_manager, self.product_manager)
         self.shipping_manager = ShippingManager(self.discount_manager)
-        self.purchase_manager = PurchaseManager(self.data_manager, self.user_manager, self.product_manager, self.discount_manager, self.shipping_manager)
+        self.order_repository = OrderRepository(self.data_manager)
+        self.order_service = OrderService(self.data_manager, self.order_repository, self.product_manager, self.user_manager)
+        self.purchase_manager = PurchaseManager(self.data_manager, self.user_manager, self.product_manager, self.discount_manager, self.shipping_manager, self.order_service)
         self.cart_manager = CartManager(self.data_manager)
-        self.order_manager = OrderManager(self.data_manager, self.user_manager, self.product_manager, self.cart_manager, self.discount_manager, self.shipping_manager, self.purchase_manager)
+        self.order_manager = OrderManager(self.user_manager, self.order_repository, self.order_service)
 
     def normalize_cmd_parts(self, parts):
         """Normalize the first token in split parts to short canonical commands.
@@ -852,7 +859,6 @@ class CLI:
         print("- 'checkout' — xaridni yakunlash")
         print("- 'h' yoki 'help' — bu yordam ekranini ko'rsatish")
         print("\nLogin:\n- Dastur ishga tushganda ism, pochta va parol so'raladi. Agar pochta mavjud bo'lsa teskari parol bilan tizimga kiriladi; aks holda hisob yaratiladi.")
-        print("- Admin uchun: email = actamovyusuf007@gmail.com, parol = luxnendo@890")
         print("- Tizimdan chiqish uchun menyuda 'logout' deb yozing.")
         print("---")
 
@@ -1961,7 +1967,6 @@ def print_help():
     print("- 'checkout' — xaridni yakunlash")
     print("- 'h' yoki 'help' — bu yordam ekranini ko'rsatish")
     print("\nLogin:\n- Dastur ishga tushganda ism, pochta va parol so'raladi. Agar pochta mavjud bo'lsa teskari parol bilan tizimga kiriladi; aks holda hisob yaratiladi.")
-    print("- Admin uchun: email = actamovyusuf007@gmail.com, parol = luxnendo@890")
     print("- Tizimdan chiqish uchun menyuda 'logout' deb yozing.")
     print("---")
 

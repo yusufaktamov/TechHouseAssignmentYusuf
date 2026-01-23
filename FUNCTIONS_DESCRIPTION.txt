@@ -1,5 +1,15 @@
 FUNCTIONS IN `index.py`
 
+OXIRGI O'ZGARISHLAR (2026-yil 23-yanvar):
+- Xavfsizlik yaxshilandi: ADMIN_EMAIL va ADMIN_PASSWORD konstantlari olib tashlandi, ensure_admin_user() metodi va uning chaqiruvlari o'chirildi.
+- Arxitektura yaxshilandi: OrderManager God Object muammosi hal qilindi - chegirma va yetkazib berish logikasi alohida klasslarga ajratildi.
+- Yangi klasslar qo'shildi: DiscountManager (chegirmalar uchun), ShippingManager (yetkazib berish uchun), PurchaseManager (sotib olish jarayoni uchun).
+- OrderManager yangilandi: eski metodlar olib tashlandi, yangi managerlar qo'shildi, checkout va purchase_product_direct metodlari soddalashtirildi.
+- CLI __init__() yangilandi: yangi managerlar qo'shildi.
+- Service/Repository qatlamlari qo'shildi: OrderRepository (ma'lumotlar kirish uchun), OrderService (buyurtma yaratish logikasi uchun), OrderManager faqat ko'rish uchun.
+- PurchaseManager endi buyurtma yaratadi va stockni yangilaydi, OrderManager orchestratsiya qilmaydi.
+- Yordam ekranidan admin credentiallari olib tashlandi: print_help() funksiyalarida admin email va parol ko'rsatilmaydi.
+
 Classes and their methods:
 
 - DataManager:
@@ -14,7 +24,6 @@ Classes and their methods:
   - hash_password(password, salt=None): Parolni PBKDF2-HMAC-SHA256 bilan xeshlaydi; salt yaratadi yoki qabul qiladi; (salt_hex, hash_hex) qaytaradi.
   - verify_password(password, salt_hex, hash_hex): Kiritilgan parolni saqlangan salt va hash bilan tekshiradi.
   - set_user_password(user, password): Foydalanuvchi obyektiga `salt` va `password_hash` maydonlarini qo'shadi; legacy `password` maydonini olib tashlaydi.
-  - ensure_admin_user(): Agar admin foydalanuvchi mavjud bo'lmasa, `ADMIN_EMAIL` va `ADMIN_PASSWORD` bilan admin yaratadi.
   - migrate_plain_passwords(): Avvalgi (legacy) `password` maydoni bo'lgan foydalanuvchilarni yangi hash sxemasiga o'tkazadi.
   - change_password_flow(): Interaktiv: email tasdiqlaydi, yangi parolni ikki marta so'raydi va agar email mavjud bo'lsa, foydalanuvchi parolini yangilaydi.
   - login_prompt(): CLI orqali login/ro'yxatdan o'tish jarayoni. Endi: Ism va email so'raladi, so'ng faqat parol maydoni qayta so'raladi (agar noto'g'ri bo'lsa). Parol maydonida `change` yozilsa `change_password_flow()` ochiladi. Yangi foydalanuvchi yaratish uchun email mavjud bo'lmasa parol bilan yangi hisob yaratiladi.
@@ -28,6 +37,24 @@ Classes and their methods:
   - show_memberships(): A'zolik paketlarini yuklab beradi.
   - get_promotions(): Promo kodlar ro'yxatini yuklab beradi.
 
+- DiscountManager:
+  - __init__(data_manager, product_manager): DataManager va ProductManager bilan ishlaydigan DiscountManager yaratadi.
+  - compute_membership_effects(total, membership_id, qty=None, shipping_method=None): A'zolikning turiga qarab chegirma, ballar, bepul yetkazib berish va maxsus chegirmalarni hisoblab qaytaradi.
+  - apply_membership_discount(total, membership_id, qty=None, shipping_method=None): compute_membership_effects wrapper; (total_after, discount) qaytaradi.
+  - apply_promo(total, code): Promo kodni tekshiradi va chegirma miqdorini hisoblaydi; amal qilmasa boshlang'ich qiymatni qaytaradi.
+
+- ShippingManager:
+  - __init__(discount_manager): DiscountManager bilan ishlaydigan ShippingManager yaratadi.
+  - get_shipping_fee(subtotal, membership_id, qty, shipping_method): Yetkazib berish usuliga qarab yetkazib berish to'lovini hisoblaydi, bepul yetkazib berishni tekshiradi va manzilni so'raydi.
+  - prompt_address(): Yetkazib berish manzilini interaktiv so'raydi.
+  - prompt_shipping_method(): Yetkazib berish usulini (delivery/pickup) so'raydi.
+
+- PurchaseManager:
+  - __init__(data_manager, user_manager, product_manager, discount_manager, shipping_manager): Barcha managerlarni birlashtirib PurchaseManager yaratadi.
+  - prompt_membership(): A'zolikni tanlash yoki mavjud a'zolikdan foydalanishni so'raydi.
+  - calculate_total(subtotal, membership_id, qty_total, promo_code): A'zolik va promo chegirmalarini qo'llab umumiy narxni hisoblaydi.
+  - process_purchase(items, subtotal, membership_id, qty_total, promo_code): To'liq sotib olish jarayonini bajaradi: chegirmalar, yetkazib berish, tasdiqlash va ma'lumotlarni qaytaradi.
+
 - CartManager:
   - __init__(data_manager): DataManager bilan ishlaydigan CartManager yaratadi.
   - load_cart(): Savatcha faylidan savatcha ob'ektini o'qiydi.
@@ -39,19 +66,27 @@ Classes and their methods:
   - remove_from_cart(prod_id): Savatchadan elementni olib tashlash (tasdiq bilan).
 
 - OrderManager:
-  - __init__(data_manager, user_manager, product_manager, cart_manager): Barcha managerlarni birlashtirib OrderManager yaratadi.
+  - __init__(user_manager, order_repository, order_service): OrderManager yaratadi.
   - get_user_orders(email): Berilgan emailga tegishli buyurtmalar ro'yxatini qaytaradi.
-  - view_my_orders(): Joriy foydalanuvchi (CURRENT_USER) uchun buyurtma tarixini ekranga chiqaradi.
-  - compute_membership_effects(total, membership_id, qty=None, shipping_method=None): A'zolikning turiga qarab chegirma, ballar, bepul yetkazib berish va maxsus chegirmalarni hisoblab qaytaradi.
-  - apply_membership_discount(total, membership_id, qty=None, shipping_method=None): compute_membership_effects wrapper; (total_after, discount) qaytaradi.
-  - apply_promo(total, code): Promo kodni tekshiradi va chegirma miqdorini hisoblaydi; amal qilmasa boshlang'ich qiymatni qaytaradi.
-  - checkout(): Savatdagi narsalarni to'lov jarayoni: a'zolik, promo, yetkazib berish, buyurtma yaratish, stockni yangilash va faylga yozish.
-  - purchase_product_direct(prod_id, qty): Mahsulotni tez sotib olish jarayoni (checkout jarayonining qisqaroq shakli), stokni yangilaydi va buyurtma yaratiladi.
+  - view_my_orders(): Joriy foydalanuvchi uchun buyurtma tarixini ekranga chiqaradi.
+  - checkout(): Savatdagi narsalarni to'lov jarayoni: PurchaseManager orqali sotib olish.
+  - purchase_product_direct(prod_id, qty): Mahsulotni tez sotib olish jarayoni (PurchaseManager orqali).
   - purchase_membership(membership_id): Joriy foydalanuvchi uchun a'zolik paketini sotib olish.
   - purchase_from_cart(prod_id): Savatchadan mahsulotni sotib olish.
 
+- OrderRepository:
+  - __init__(data_manager): DataManager bilan ishlaydigan OrderRepository yaratadi.
+  - load_orders(): Buyurtmalar faylini o'qiydi.
+  - save_orders(orders): Buyurtmalar ro'yxatini faylga saqlaydi.
+  - get_user_orders(email): Berilgan emailga tegishli buyurtmalar ro'yxatini qaytaradi.
+  - create_order(order_data): Yangi buyurtma yaratadi va faylga saqlaydi.
+
+- OrderService:
+  - __init__(data_manager, order_repository, product_manager, user_manager): Barcha kerakli komponentlarni birlashtirib OrderService yaratadi.
+  - create_order_from_purchase(purchase_data): Sotib olish ma'lumotlaridan buyurtma yaratadi, stockni yangilaydi va foydalanuvchi yozuviga qo'shadi.
+
 - CLI:
-  - __init__(): Barcha managerlarni yaratib CLI interfeysini ishga tushiradi.
+  - __init__(): Barcha managerlarni (DataManager, UserManager, ProductManager, DiscountManager, ShippingManager, OrderRepository, OrderService, PurchaseManager, CartManager, OrderManager) yaratib CLI interfeysini ishga tushiradi.
   - normalize_cmd_parts(parts): CLI buyruqlarining birinchi tokenini qisqartma (canonical) ga normalizatsiya qiladi (masalan "add" -> "a").
   - admin_menu(): Admin uchun menyu; foydalanuvchilar, mahsulotlar, buyurtmalar va mahsulot qo'shish imkoniyatlari.
   - send_support_message(): Qo'llab-quvvatlash uchun xabar yuborish interfeysi.

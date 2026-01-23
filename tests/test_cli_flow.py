@@ -228,7 +228,14 @@ def test_admin_sees_all_purchases(monkeypatch):
         orders.append({"id": 1002, "items": [{"product_id": 2, "qty": 2, "name": "Bprod"}], "total": 20.0, "user_email": "b@example.com", "created_at": "2026-01-02T00:00:00"})
         shop.save_json(shop.ORDERS_FILE, orders)
         # ensure admin
-        admin = shop.find_user_by_email(shop.ADMIN_EMAIL)
+        users = shop.load_users()
+        admin = next((u for u in users if u.get('is_admin')), None)
+        if not admin:
+            # create admin if not exists
+            admin = {"name": "Admin", "email": "admin@example.com", "address": "", "orders": [], "is_admin": True}
+            shop.set_user_password(admin, "adminpass")
+            users.append(admin)
+            shop.save_users(users)
         shop.CURRENT_USER = admin
         # run admin menu choice 1 then exit
         seq = iter(['1','0'])
@@ -250,7 +257,14 @@ def test_admin_handles_orders_without_user_email(monkeypatch, capsys):
         # create an order with missing user_email
         orders.append({"id":3001, "items":[{"product_id":1, "qty":1, "name":"NoUserProd"}], "total":50.0, "created_at":"2026-01-02T13:00:00"})
         shop.save_json(shop.ORDERS_FILE, orders)
-        admin = shop.find_user_by_email(shop.ADMIN_EMAIL)
+        users = shop.load_users()
+        admin = next((u for u in users if u.get('is_admin')), None)
+        if not admin:
+            # create admin if not exists
+            admin = {"name": "Admin", "email": "admin@example.com", "address": "", "orders": [], "is_admin": True}
+            shop.set_user_password(admin, "adminpass")
+            users.append(admin)
+            shop.save_users(users)
         shop.CURRENT_USER = admin
         seq = iter(['3','0'])
         monkeypatch.setattr('builtins.input', lambda prompt='': next(seq))
@@ -267,7 +281,14 @@ def test_admin_add_product(monkeypatch):
     try:
         prods = shop.load_json(shop.PRODUCTS_FILE)
         orig = len(prods)
-        admin = shop.find_user_by_email(shop.ADMIN_EMAIL)
+        users = shop.load_users()
+        admin = next((u for u in users if u.get('is_admin')), None)
+        if not admin:
+            # create admin if not exists
+            admin = {"name": "Admin", "email": "admin@example.com", "address": "", "orders": [], "is_admin": True}
+            shop.set_user_password(admin, "adminpass")
+            users.append(admin)
+            shop.save_users(users)
         shop.CURRENT_USER = admin
         seq = iter(['4', 'NewProduct', '123.45', 'TestType', '7', '0'])
         monkeypatch.setattr('builtins.input', lambda prompt='': next(seq))
@@ -296,7 +317,14 @@ def test_admin_sees_global_order_history(monkeypatch, capsys):
         orders = shop.load_json(shop.ORDERS_FILE)
         orders.append({"id":2001,"items":[{"product_id":1,"qty":2,"name":"ProdX"}],"total":123.0,"user_email":"guy@example.com","created_at":"2026-01-02T12:00:00"})
         shop.save_json(shop.ORDERS_FILE, orders)
-        admin = shop.find_user_by_email(shop.ADMIN_EMAIL)
+        users = shop.load_users()
+        admin = next((u for u in users if u.get('is_admin')), None)
+        if not admin:
+            # create admin if not exists
+            admin = {"name": "Admin", "email": "admin@example.com", "address": "", "orders": [], "is_admin": True}
+            shop.set_user_password(admin, "adminpass")
+            users.append(admin)
+            shop.save_users(users)
         shop.CURRENT_USER = admin
         seq = iter(['3','0'])
         monkeypatch.setattr('builtins.input', lambda prompt='': next(seq))
