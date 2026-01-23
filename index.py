@@ -14,9 +14,6 @@ USERS_FILE = os.path.join(DATA_DIR, "users.json")
 
 SHIPPING_FEE = 50.0
 
-ADMIN_EMAIL = "actamovyusuf007@gmail.com"
-ADMIN_PASSWORD = "luxnendo@890"
-
 
 class DataManager:
     def load_json(self, path):
@@ -26,6 +23,177 @@ class DataManager:
     def save_json(self, path, data):
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+class DiscountManager:
+    def __init__(self, data_manager, product_manager):
+        self.data_manager = data_manager
+        self.product_manager = product_manager
+
+    def compute_membership_effects(self, total, membership_id, qty=None, shipping_method=None):
+        """Return a dict describing membership effects on the given order total.
+        Keys: membership (dict or None), discount (float), total_after_discount (float),
+        points_earned (int), priority_support (bool), free_shipping (bool), special_discount (float)
+        """
+        result = {
+            "membership": None,
+            "discount": 0.0,
+            "total_after_discount": total,
+            "points_earned": 0,
+            "priority_support": False,
+            "free_shipping": False,
+            "special_discount": 0.0
+        }
+        if not membership_id:
+            return result
+        memberships = self.product_manager.show_memberships()
+        mem = next((m for m in memberships if m["id"] == membership_id), None)
+        if not mem:
+            return result
+        result["membership"] = mem
+        # base discount
+        base_discount = total * mem.get("discount_rate", 0.0)
+        result["discount"] = base_discount
+        # points
+        points_mult = mem.get("points_multiplier", 1)
+        result["points_earned"] = int(total * points_mult)
+        # priority support
+        result["priority_support"] = bool(mem.get("priority_support", False))
+        # special business bulk pricing: if Business and qty provided and qty >= 10 give extra 10% off
+        special = 0.0
+        if mem.get("name", "").lower() == "business" and qty and qty >= 10:
+            special = total * 0.10
+            result["special_discount"] = special
+            result["discount"] += special
+        # total after discounts
+        result["total_after_discount"] = max(total - result["discount"], 0.0)
+        # free shipping: if membership has free_shipping_threshold and shipping_method is delivery
+        threshold = mem.get("free_shipping_threshold")
+        if shipping_method and shipping_method == "delivery" and threshold is not None:
+            result["free_shipping"] = total >= float(threshold)
+        return result
+
+    def apply_membership_discount(self, total, membership_id, qty=None, shipping_method=None):
+        """Backwards-compatible wrapper: return (total_after, discount_amount)
+        Accepts optional qty and shipping_method to support business bulk pricing and free-shipping checks."""
+        eff = self.compute_membership_effects(total, membership_id, qty=qty, shipping_method=shipping_method)
+        return eff["total_after_discount"], eff["discount"]
+
+    def apply_promo(self, total, code):
+        if not code:
+            return total, 0.0
+        promos = self.product_manager.get_promotions()
+        now = datetime.now().date()
+        for p in promos:
+            if p["code"].lower() == code.lower():
+                start = datetime.strptime(p["start_date"], "%Y-%m-%d").date()
+                end = datetime.strptime(p["end_date"], "%Y-%m-%d").date()
+                if start <= now <= end:
+                    if p["discount_type"] == "percent":
+                        discount = total * (p["value"] / 100.0)
+                    else:
+                        discount = p["value"]
+                    return max(total - discount, 0.0), discount
+        print("Promo kod topilmadi yoki amal qilish muddati tugagan.")
+        return total, 0.0
+
+
+class ShippingManager:
+    def __init__(self, discount_manager):
+        self.discount_manager = discount_manager
+
+    def get_shipping_fee(self, subtotal, membership_id, qty, shipping_method):
+        if shipping_method == "pickup":
+            return 0.0, None
+        elif shipping_method == "delivery":
+            address = self.prompt_address()
+            if address is None:
+                return None, None  # cancelled
+            mem_eff = self.discount_manager.compute_membership_effects(subtotal, membership_id, qty=qty, shipping_method=shipping_method)
+            if mem_eff["free_shipping"]:
+                return 0.0, address
+            else:
+                return SHIPPING_FEE, address
+        else:
+            return None, None
+
+    def prompt_address(self):
+        while True:
+            address = input("Yetkazib berish manzili (b->bekor qilish): ").strip()
+            if not address:
+                print("Manzil bo'sh bo'lishi mumkin emas.")
+                continue
+            if address.lower() in ("b", "back", "0"):
+                print("Checkout bekor qilindi.")
+                return None
+            return address
+
+    def prompt_shipping_method(self):
+        while True:
+            shipping_method = input("Yetkazib berish yoki pickup? (delivery/pickup): ").strip().lower()
+            if shipping_method in ("delivery", "pickup"):
+                return shipping_method
+            print("Iltimos 'delivery' yoki 'pickup' yozing.")
+
+
+class PurchaseManager:
+    def __init__(self, data_manager, user_manager, product_manager, discount_manager, shipping_manager):
+        self.data_manager = data_manager
+        self.user_manager = user_manager
+        self.product_manager = product_manager
+        self.discount_manager = discount_manager
+        self.shipping_manager = shipping_manager
+
+    def prompt_membership(self):
+        membership_id = None
+        if self.user_manager.current_user and isinstance(self.user_manager.current_user, dict) and self.user_manager.current_user.get('membership_id'):
+            use_mem = input("Sizda a'zolik mavjud. Chegirmadan foydalanasizmi? (ha/no): ").strip().lower()
+            if use_mem in ("ha", "yes", "y"):
+                membership_id = self.user_manager.current_user.get('membership_id')
+        else:
+            mem_choice = input("A'zolik ID (yoksa ENTER): ").strip()
+            membership_id = int(mem_choice) if mem_choice.isdigit() else None
+            if membership_id:
+                mems = self.product_manager.show_memberships()
+                if not any(m['id'] == membership_id for m in mems):
+                    print("Bunday a'zolik topilmadi. A'zolik e'tiborga olinmaydi.")
+                    membership_id = None
+        return membership_id
+
+    def calculate_total(self, subtotal, membership_id, qty_total, promo_code):
+        total_after_mem, mem_discount = self.discount_manager.apply_membership_discount(subtotal, membership_id, qty=qty_total)
+        mem_eff_preview = self.discount_manager.compute_membership_effects(subtotal, membership_id, qty=qty_total, shipping_method=None)
+        print(f"A'zolik chegirmasi: {mem_discount:.2f} -> {total_after_mem:.2f}")
+        if mem_eff_preview["points_earned"]:
+            print(f"A'zolik ballari (kupon/ballar): {mem_eff_preview['points_earned']}")
+        if mem_eff_preview["priority_support"]:
+            print("Sizga ustuvor qo'llab-quvvatlash taqdim etiladi.")
+        total_after_promo, promo_discount = self.discount_manager.apply_promo(total_after_mem, promo_code)
+        print(f"Promo chegirma: {promo_discount:.2f} -> {total_after_promo:.2f}")
+        return total_after_promo, mem_discount, promo_discount
+
+    def process_purchase(self, items, subtotal, membership_id, qty_total, promo_code):
+        total_after_promo, mem_discount, promo_discount = self.calculate_total(subtotal, membership_id, qty_total, promo_code)
+        shipping_method = self.shipping_manager.prompt_shipping_method()
+        shipping_fee, address = self.shipping_manager.get_shipping_fee(subtotal, membership_id, qty_total, shipping_method)
+        if shipping_fee is None:
+            return None  # cancelled
+        total = total_after_promo + shipping_fee
+        print(f"Yakuniy to'lov: {total:.2f} (shipping: {shipping_fee:.2f})")
+        confirm = input("Buyurtmani tasdiqlaysizmi? (ha/no): ").strip().lower()
+        if confirm not in ("ha", "yes", "y"):
+            print("Buyurtma bekor qilindi.")
+            return None
+        return {
+            "items": items,
+            "subtotal": subtotal,
+            "membership_discount": mem_discount,
+            "promo_discount": promo_discount,
+            "shipping_fee": shipping_fee,
+            "total": total,
+            "shipping_method": shipping_method,
+            "address": address
+        }
 
 
 class UserManager:
@@ -71,20 +239,6 @@ class UserManager:
         user.pop("password", None)
         user["password_hash"] = phash
         user["salt"] = salt
-
-    def ensure_admin_user(self):
-        users = self.load_users()
-        if not any(u.get("email") == ADMIN_EMAIL for u in users):
-            admin = {
-                "name": "Admin",
-                "email": ADMIN_EMAIL,
-                "address": "",
-                "orders": [],
-                "is_admin": True
-            }
-            self.set_user_password(admin, ADMIN_PASSWORD)
-            users.append(admin)
-            self.save_users(users)
 
     def migrate_plain_passwords(self):
         users = self.load_users()
@@ -327,11 +481,14 @@ class CartManager:
 
 
 class OrderManager:
-    def __init__(self, data_manager, user_manager, product_manager, cart_manager):
+    def __init__(self, data_manager, user_manager, product_manager, cart_manager, discount_manager, shipping_manager, purchase_manager):
         self.data_manager = data_manager
         self.user_manager = user_manager
         self.product_manager = product_manager
         self.cart_manager = cart_manager
+        self.discount_manager = discount_manager
+        self.shipping_manager = shipping_manager
+        self.purchase_manager = purchase_manager
 
     def get_user_orders(self, email):
         """Return list of orders for a given user email."""
@@ -352,73 +509,6 @@ class OrderManager:
             for it in o.get("items", []):
                 print(f"  - {it.get('name')} x {it.get('qty')}")
 
-    def compute_membership_effects(self, total, membership_id, qty=None, shipping_method=None):
-        """Return a dict describing membership effects on the given order total.
-        Keys: membership (dict or None), discount (float), total_after_discount (float),
-        points_earned (int), priority_support (bool), free_shipping (bool), special_discount (float)
-        """
-        result = {
-            "membership": None,
-            "discount": 0.0,
-            "total_after_discount": total,
-            "points_earned": 0,
-            "priority_support": False,
-            "free_shipping": False,
-            "special_discount": 0.0
-        }
-        if not membership_id:
-            return result
-        memberships = self.product_manager.show_memberships()
-        mem = next((m for m in memberships if m["id"] == membership_id), None)
-        if not mem:
-            return result
-        result["membership"] = mem
-        # base discount
-        base_discount = total * mem.get("discount_rate", 0.0)
-        result["discount"] = base_discount
-        # points
-        points_mult = mem.get("points_multiplier", 1)
-        result["points_earned"] = int(total * points_mult)
-        # priority support
-        result["priority_support"] = bool(mem.get("priority_support", False))
-        # special business bulk pricing: if Business and qty provided and qty >= 10 give extra 10% off
-        special = 0.0
-        if mem.get("name", "").lower() == "business" and qty and qty >= 10:
-            special = total * 0.10
-            result["special_discount"] = special
-            result["discount"] += special
-        # total after discounts
-        result["total_after_discount"] = max(total - result["discount"], 0.0)
-        # free shipping: if membership has free_shipping_threshold and shipping_method is delivery
-        threshold = mem.get("free_shipping_threshold")
-        if shipping_method and shipping_method == "delivery" and threshold is not None:
-            result["free_shipping"] = total >= float(threshold)
-        return result
-
-    def apply_membership_discount(self, total, membership_id, qty=None, shipping_method=None):
-        """Backwards-compatible wrapper: return (total_after, discount_amount)
-        Accepts optional qty and shipping_method to support business bulk pricing and free-shipping checks."""
-        eff = self.compute_membership_effects(total, membership_id, qty=qty, shipping_method=shipping_method)
-        return eff["total_after_discount"], eff["discount"]
-
-    def apply_promo(self, total, code):
-        if not code:
-            return total, 0.0
-        promos = self.product_manager.get_promotions()
-        now = datetime.now().date()
-        for p in promos:
-            if p["code"].lower() == code.lower():
-                start = datetime.strptime(p["start_date"], "%Y-%m-%d").date()
-                end = datetime.strptime(p["end_date"], "%Y-%m-%d").date()
-                if start <= now <= end:
-                    if p["discount_type"] == "percent":
-                        discount = total * (p["value"] / 100.0)
-                    else:
-                        discount = p["value"]
-                    return max(total - discount, 0.0), discount
-        print("Promo kod topilmadi yoki amal qilish muddati tugagan.")
-        return total, 0.0
-
     def checkout(self):
         cart = self.cart_manager.load_cart()
         if not cart["items"]:
@@ -426,75 +516,17 @@ class OrderManager:
             return
         subtotal = sum(it["unit_price"] * it["qty"] for it in cart["items"])
         print(f"Subtotal: {subtotal:.2f}")
-        # membership (if user already bought a membership, ask whether to use it)
-        membership_id = None
-        if self.user_manager.current_user and isinstance(self.user_manager.current_user, dict) and self.user_manager.current_user.get('membership_id'):
-            use_mem = input("Sizda a'zolik mavjud. Chegirmadan foydalanasizmi? (ha/no): ").strip().lower()
-            if use_mem in ("ha", "yes", "y"):
-                membership_id = self.user_manager.current_user.get('membership_id')
-        else:
-            mem_choice = input("A'zolik ID (yoksa ENTER): ").strip()
-            membership_id = int(mem_choice) if mem_choice.isdigit() else None
-            if membership_id:
-                mems = self.product_manager.show_memberships()
-                if not any(m['id'] == membership_id for m in mems):
-                    print("Bunday a'zolik topilmadi. A'zolik e'tiborga olinmaydi.")
-                    membership_id = None
+        membership_id = self.purchase_manager.prompt_membership()
         qty_total = sum(it.get('qty', 0) for it in cart['items'])
-        total_after_mem, mem_discount = self.apply_membership_discount(subtotal, membership_id, qty=qty_total)
-        # display richer membership info
-        mem_eff_preview = self.compute_membership_effects(subtotal, membership_id, qty=qty_total, shipping_method=None)
-        print(f"A'zolik chegirmasi: {mem_discount:.2f} -> {total_after_mem:.2f}")
-        if mem_eff_preview["points_earned"]:
-            print(f"A'zolik ballari (kupon/ballar): {mem_eff_preview['points_earned']}")
-        if mem_eff_preview["priority_support"]:
-            print("Sizga ustuvor qo'llab-quvvatlash taqdim etiladi.")
-        # promo
         promo_code = input("Promo kod (yoksa ENTER): ").strip()
-        total_after_promo, promo_discount = self.apply_promo(total_after_mem, promo_code)
-        print(f"Promo chegirma: {promo_discount:.2f} -> {total_after_promo:.2f}")
-        # shipping
-        while True:
-            shipping_method = input("Yetkazib berish yoki pickup? (delivery/pickup): ").strip().lower()
-            if shipping_method in ("delivery", "pickup"):
-                break
-            print("Iltimos 'delivery' yoki 'pickup' yozing.")
-        shipping_fee = 0.0
-        address = None
-        if shipping_method == "delivery":
-            while True:
-                address = input("Yetkazib berish manzili (b->bekor qilish): ").strip()
-                if not address:
-                    print("Manzil bo'sh bo'lishi mumkin emas.")
-                    continue
-                if address.lower() in ("b", "back", "0"):
-                    print("Checkout bekor qilindi.")
-                    return
-                break
-            # recompute membership effects with shipping method to see if free shipping applies
-            mem_eff = self.compute_membership_effects(subtotal, membership_id, qty=qty_total, shipping_method=shipping_method)
-            if mem_eff["free_shipping"]:
-                shipping_fee = 0.0
-            else:
-                shipping_fee = SHIPPING_FEE
-        total = total_after_promo + shipping_fee
-        print(f"Yakuniy to'lov: {total:.2f} (shipping: {shipping_fee:.2f})")
-        confirm = input("Buyurtmani tasdiqlaysizmi? (ha/no): ").strip().lower()
-        if confirm not in ("ha", "yes", "y"):
-            print("Buyurtma bekor qilindi.")
+        purchase_data = self.purchase_manager.process_purchase(cart["items"], subtotal, membership_id, qty_total, promo_code)
+        if purchase_data is None:
             return
         # create order and update stocks
         orders = self.data_manager.load_json(ORDERS_FILE)
         order = {
             "id": len(orders) + 1,
-            "items": cart["items"],
-            "subtotal": subtotal,
-            "membership_discount": mem_discount,
-            "promo_discount": promo_discount,
-            "shipping_fee": shipping_fee,
-            "total": total,
-            "shipping_method": shipping_method,
-            "address": address,
+            **purchase_data,
             "user_email": self.user_manager.current_user.get("email") if self.user_manager.current_user else None,
             "user_name": self.user_manager.current_user.get("name") if self.user_manager.current_user else None,
             "created_at": datetime.now().isoformat()
@@ -516,7 +548,7 @@ class OrderManager:
                 u.setdefault('orders', []).append(order['id'])
                 self.user_manager.save_users(users)
         self.cart_manager.clear_cart()
-        print(f"Buyurtma #{order['id']} qabul qilindi. Jami: {total:.2f}")
+        print(f"Buyurtma #{order['id']} qabul qilindi. Jami: {order['total']:.2f}")
 
     def purchase_product_direct(self, prod_id, qty):
         product = self.product_manager.find_product(prod_id)
@@ -531,76 +563,22 @@ class OrderManager:
             return False
         subtotal = product["price"] * qty
         print(f"Subtotal: {subtotal:.2f}")
-        # membership (if user already bought a membership, ask whether to use it)
-        membership_id = None
-        if self.user_manager.current_user and isinstance(self.user_manager.current_user, dict) and self.user_manager.current_user.get('membership_id'):
-            use_mem = input("Sizda a'zolik mavjud. Chegirmadan foydalanasizmi? (ha/no): ").strip().lower()
-            if use_mem in ("ha", "yes", "y"):
-                membership_id = self.user_manager.current_user.get('membership_id')
-        else:
-            mem_choice = input("A'zolik ID (yoksa ENTER): ").strip()
-            membership_id = int(mem_choice) if mem_choice.isdigit() else None
-            if membership_id:
-                mems = self.product_manager.show_memberships()
-                if not any(m['id'] == membership_id for m in mems):
-                    print("Bunday a'zolik topilmadi. A'zolik e'tiborga olinmaydi.")
-                    membership_id = None
-        total_after_mem, mem_discount = self.apply_membership_discount(subtotal, membership_id, qty=qty)
-        mem_eff_preview = self.compute_membership_effects(subtotal, membership_id, qty=qty, shipping_method=None)
-        print(f"A'zolik chegirmasi: {mem_discount:.2f} -> {total_after_mem:.2f}")
-        if mem_eff_preview["points_earned"]:
-            print(f"A'zolik ballari: {mem_eff_preview['points_earned']}")
-        if mem_eff_preview["priority_support"]:
-            print("Sizga ustuvor qo'llab-quvvatlash taqdim etiladi.")
-        # promo
+        membership_id = self.purchase_manager.prompt_membership()
         promo_code = input("Promo kod (yoksa ENTER): ").strip()
-        total_after_promo, promo_discount = self.apply_promo(total_after_mem, promo_code)
-        print(f"Promo chegirma: {promo_discount:.2f} -> {total_after_promo:.2f}")
-        # shipping
-        while True:
-            shipping_method = input("Yetkazib berish yoki pickup? (delivery/pickup): ").strip().lower()
-            if shipping_method in ("delivery", "pickup"):
-                break
-            print("Iltimos 'delivery' yoki 'pickup' yozing.")
-        shipping_fee = 0.0
-        address = None
-        if shipping_method == "delivery":
-            while True:
-                address = input("Yetkazib berish manzili (b->bekor qilish): ").strip()
-                if not address:
-                    print("Manzil bo'sh bo'lishi mumkin emas.")
-                    continue
-                if address.lower() in ("b", "back", "0"):
-                    print("Buyurtma bekor qilindi.")
-                    return False
-                break
-            # check membership free shipping for delivery
-            mem_eff = self.compute_membership_effects(subtotal, membership_id, qty=qty, shipping_method=shipping_method)
-            if mem_eff["free_shipping"]:
-                shipping_fee = 0.0
-            else:
-                shipping_fee = SHIPPING_FEE
-        total = total_after_promo + shipping_fee
-        print(f"Yakuniy to'lov: {total:.2f} (shipping: {shipping_fee:.2f})")
-        if not self.cart_manager.ask_confirm("Buyurtmani tasdiqlaysizmi? (ha/no): "):
-            print("Buyurtma bekor qilindi.")
+        items = [{
+            "product_id": prod_id,
+            "qty": qty,
+            "unit_price": product["price"],
+            "name": product["name"]
+        }]
+        purchase_data = self.purchase_manager.process_purchase(items, subtotal, membership_id, qty, promo_code)
+        if purchase_data is None:
             return False
+        # create order and update stocks
         orders = self.data_manager.load_json(ORDERS_FILE)
         order = {
             "id": len(orders) + 1,
-            "items": [{
-                "product_id": prod_id,
-                "qty": qty,
-                "unit_price": product["price"],
-                "name": product["name"]
-            }],
-            "subtotal": subtotal,
-            "membership_discount": mem_discount,
-            "promo_discount": promo_discount,
-            "shipping_fee": shipping_fee,
-            "total": total,
-            "shipping_method": shipping_method,
-            "address": address,
+            **purchase_data,
             "user_email": self.user_manager.current_user.get("email") if self.user_manager.current_user else None,
             "user_name": self.user_manager.current_user.get("name") if self.user_manager.current_user else None,
             "created_at": datetime.now().isoformat()
@@ -619,7 +597,7 @@ class OrderManager:
             if u is not None:
                 u.setdefault('orders', []).append(order['id'])
                 self.user_manager.save_users(users)
-        print(f"Buyurtma #{order['id']} qabul qilindi. Jami: {total:.2f}")
+        print(f"Buyurtma #{order['id']} qabul qilindi. Jami: {order['total']:.2f}")
         return True
 
     def purchase_membership(self, membership_id):
@@ -694,8 +672,11 @@ class CLI:
         self.data_manager = DataManager()
         self.user_manager = UserManager(self.data_manager)
         self.product_manager = ProductManager(self.data_manager)
+        self.discount_manager = DiscountManager(self.data_manager, self.product_manager)
+        self.shipping_manager = ShippingManager(self.discount_manager)
+        self.purchase_manager = PurchaseManager(self.data_manager, self.user_manager, self.product_manager, self.discount_manager, self.shipping_manager)
         self.cart_manager = CartManager(self.data_manager)
-        self.order_manager = OrderManager(self.data_manager, self.user_manager, self.product_manager, self.cart_manager)
+        self.order_manager = OrderManager(self.data_manager, self.user_manager, self.product_manager, self.cart_manager, self.discount_manager, self.shipping_manager, self.purchase_manager)
 
     def normalize_cmd_parts(self, parts):
         """Normalize the first token in split parts to short canonical commands.
@@ -884,7 +865,6 @@ class CLI:
         # ensure users file exists and admin is present
         if not os.path.exists(USERS_FILE):
             self.data_manager.save_json(USERS_FILE, [])
-        self.user_manager.ensure_admin_user()
         # ask user to login before showing main menu
         login_result = self.user_manager.login_prompt()
         if login_result == "admin":
@@ -1281,21 +1261,6 @@ def set_user_password(user, password):
     user.pop("password", None)
     user["password_hash"] = phash
     user["salt"] = salt
-
-
-def ensure_admin_user():
-    users = load_users()
-    if not any(u.get("email") == ADMIN_EMAIL for u in users):
-        admin = {
-            "name": "Admin",
-            "email": ADMIN_EMAIL,
-            "address": "",
-            "orders": [],
-            "is_admin": True
-        }
-        set_user_password(admin, ADMIN_PASSWORD)
-        users.append(admin)
-        save_users(users)
 
 
 def migrate_plain_passwords():
@@ -2010,7 +1975,6 @@ def main():
     # ensure users file exists and admin is present
     if not os.path.exists(USERS_FILE):
         save_json(USERS_FILE, [])
-    ensure_admin_user()
     # ask user to login before showing main menu
     login_prompt()
     while True:

@@ -5,8 +5,8 @@
     "address": "",
     "orders": [],
     "is_admin": true,
-    "password_hash": "148c8d1ebbbb9298772866aeabcd0cf8ff5e8443893d94f608e09a869df2859c",
-    "salt": "5d798461a440f03c74706ba45833754e"
+    "password_hash": "e27b4ee9a66602764c7409686a4c28af0bc0c8e7fef84d9bad58386759aa1e3c",
+    "salt": "0d83091acd941e1f2716613b50f791a9"
   },
   {
     "name": "Test",
